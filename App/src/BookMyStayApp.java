@@ -1,99 +1,73 @@
+import java.util.HashMap;
+import java.util.Map;
 
-abstract class Room {
+class RoomInventory {
 
-    private int beds;
-    private double size;
-    private double price;
+    // Centralized data structure for availability
+    private Map<String, Integer> availabilityMap;
 
-    public Room(int beds, double size, double price) {
-        this.beds = beds;
-        this.size = size;
-        this.price = price;
+    /**
+     * Constructor initializes room availability
+     */
+    public RoomInventory() {
+        availabilityMap = new HashMap<>();
+
+        // Initial inventory setup
+        availabilityMap.put("Single Room", 5);
+        availabilityMap.put("Double Room", 3);
+        availabilityMap.put("Suite Room", 2);
     }
 
-    public int getBeds() {
-        return beds;
+    /**
+     * Get availability for a specific room type
+     */
+    public int getAvailability(String roomType) {
+        return availabilityMap.getOrDefault(roomType, 0);
     }
 
-    public double getSize() {
-        return size;
+    /**
+     * Update availability for a specific room type
+     */
+    public void updateAvailability(String roomType, int count) {
+        availabilityMap.put(roomType, count);
     }
 
-    public double getPrice() {
-        return price;
-    }
-    public abstract String getRoomType();
-    public void displayDetails() {
-        System.out.println("Room Type: " + getRoomType());
-        System.out.println("Beds: " + beds);
-        System.out.println("Size: " + size + " sq.ft");
-        System.out.println("Price: $" + price);
-    }
-}
-class SingleRoom extends Room {
+    /**
+     * Display full inventory state
+     */
+    public void displayInventory() {
+        System.out.println("=== Room Inventory ===");
 
-    public SingleRoom() {
-        super(1, 200, 100);
-    }
-
-    @Override
-    public String getRoomType() {
-        return "Single Room";
-    }
-}
-class DoubleRoom extends Room {
-
-    public DoubleRoom() {
-        super(2, 350, 180);
-    }
-
-    @Override
-    public String getRoomType() {
-        return "Double Room";
-    }
-}
-class SuiteRoom extends Room {
-
-    public SuiteRoom() {
-        super(3, 600, 400);
-    }
-
-    @Override
-    public String getRoomType() {
-        return "Suite Room";
+        for (Map.Entry<String, Integer> entry : availabilityMap.entrySet()) {
+            System.out.println(entry.getKey() + " -> Available: " + entry.getValue());
+        }
     }
 }
 
 
 public class BookMyStayApp {
     public static void main(String[] args){
-        // Create room objects (Polymorphism in action)
-        Room singleRoom = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suiteRoom = new SuiteRoom();
+        // Initialize inventory (Single Source of Truth)
+        RoomInventory inventory = new RoomInventory();
 
-        // Static availability (simple variables)
-        int singleAvailability = 5;
-        int doubleAvailability = 3;
-        int suiteAvailability = 2;
+        // Display current inventory
+        inventory.displayInventory();
 
-        System.out.println("=== Hotel Room Availability ===");
-
-        // Display Single Room
-        singleRoom.displayDetails();
-        System.out.println("Available Units: " + singleAvailability);
         System.out.println();
 
-        // Display Double Room
-        doubleRoom.displayDetails();
-        System.out.println("Available Units: " + doubleAvailability);
+        // Retrieve availability
+        int singleRooms = inventory.getAvailability("Single Room");
+        System.out.println("Single Room Availability: " + singleRooms);
+
         System.out.println();
 
-        // Display Suite Room
-        suiteRoom.displayDetails();
-        System.out.println("Available Units: " + suiteAvailability);
-        System.out.println();
+        // Update availability (simulate booking)
+        System.out.println("Booking 1 Single Room...");
+        inventory.updateAvailability("Single Room", singleRooms - 1);
 
-        System.out.println("Application terminated successfully.");
+        // Display updated inventory
+        inventory.displayInventory();
+
+        System.out.println("\nApplication terminated successfully.");
     }
 }
