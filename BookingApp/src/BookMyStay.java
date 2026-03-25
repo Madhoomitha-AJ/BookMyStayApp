@@ -3,96 +3,96 @@ public class BookMyStay {
     public static void main(String[] args) {
 
 
-// Reservation Class (Core - unchanged)
+// Custom Exception
+        class InvalidBookingException extends Exception {
+            public InvalidBookingException(String message) {
+                super(message);
+            }
+        }
+
+// Reservation Class
         class Reservation {
             private String reservationId;
-            private String guestName;
-            private double amount;
+            private String roomType;
+            private int roomsBooked;
 
-            public Reservation(String reservationId, String guestName, double amount) {
+            public Reservation(String reservationId, String roomType, int roomsBooked) {
                 this.reservationId = reservationId;
-                this.guestName = guestName;
-                this.amount = amount;
+                this.roomType = roomType;
+                this.roomsBooked = roomsBooked;
+            }
+
+            public String getRoomType() {
+                return roomType;
+            }
+
+            public int getRoomsBooked() {
+                return roomsBooked;
             }
 
             public String getReservationId() {
                 return reservationId;
             }
-
-            public String getGuestName() {
-                return guestName;
-            }
-
-            public double getAmount() {
-                return amount;
-            }
         }
 
-// Booking History (stores confirmed bookings)
-        class BookingHistory {
-            private List<Reservation> history = new ArrayList<>();
+// Validator Class
+        class InvalidBookingValidator {
 
-            // Add confirmed reservation
-            public void addReservation(Reservation r) {
-                history.add(r); // maintains insertion order
+            // Simulated inventory
+            private static Map<String, Integer> inventory = new HashMap<>();
+
+            static {
+                inventory.put("Single", 5);
+                inventory.put("Double", 3);
+                inventory.put("Suite", 2);
             }
 
-            // Retrieve all reservations
-            public List<Reservation> getAllReservations() {
-                return history;
-            }
-        }
+            public static void validate(Reservation r) throws InvalidBookingException {
 
-// Reporting Service
-        class BookingReportService {
+                // Validate room type
+                if (!inventory.containsKey(r.getRoomType())) {
+                    throw new InvalidBookingException("Invalid room type selected.");
+                }
 
-            // Display all bookings
-            public void displayAllBookings(List<Reservation> reservations) {
-                System.out.println("Booking History:");
-                for (Reservation r : reservations) {
-                    System.out.println(
-                            r.getReservationId() + " | " +
-                                    r.getGuestName() + " | ₹" +
-                                    r.getAmount()
-                    );
+                // Validate booking count
+                if (r.getRoomsBooked() <= 0) {
+                    throw new InvalidBookingException("Number of rooms must be greater than zero.");
+                }
+
+                // Validate availability
+                int available = inventory.get(r.getRoomType());
+                if (r.getRoomsBooked() > available) {
+                    throw new InvalidBookingException("Not enough rooms available.");
                 }
             }
 
-            // Generate total revenue report
-            public double calculateTotalRevenue(List<Reservation> reservations) {
-                double total = 0;
-                for (Reservation r : reservations) {
-                    total += r.getAmount();
-                }
-                return total;
-            }
-
-            // Count total bookings
-            public int totalBookings(List<Reservation> reservations) {
-                return reservations.size();
+            // Update inventory only after validation
+            public static void updateInventory(Reservation r) {
+                int available = inventory.get(r.getRoomType());
+                inventory.put(r.getRoomType(), available - r.getRoomsBooked());
             }
         }
 
-// Main Class (Simulation)
-                // Create booking history
-                BookingHistory history = new BookingHistory();
+// Main Class
 
-                // Simulate confirmed bookings
-                history.addReservation(new Reservation("R101", "Alice", 2500));
-                history.addReservation(new Reservation("R102", "Bob", 3000));
-                history.addReservation(new Reservation("R103", "Charlie", 2000));
+                // Example booking
+                Reservation r = new Reservation("R201", "Double", 2);
 
-                // Admin uses report service
-                BookingReportService report = new BookingReportService();
+                try {
+                    // Validate first (Fail-Fast)
+                    InvalidBookingValidator.validate(r);
 
-                // Display bookings
-                report.displayAllBookings(history.getAllReservations());
+                    // Update inventory only if valid
+                    InvalidBookingValidator.updateInventory(r);
 
-                // Generate reports
-                System.out.println("\nTotal Bookings: " +
-                        report.totalBookings(history.getAllReservations()));
+                    System.out.println("Booking confirmed for Reservation ID: " + r.getReservationId());
 
-                System.out.println("Total Revenue: ₹" +
-                        report.calculateTotalRevenue(history.getAllReservations()));
+                } catch (InvalidBookingException e) {
+                    // Graceful failure handling
+                    System.out.println("Booking Failed: " + e.getMessage());
+                }
+
+                // System continues running
+                System.out.println("System is still running safely...");
             }
         }
