@@ -3,118 +3,95 @@ public class BookMyStay {
     public static void main(String[] args) {
 
 
+        // ---------------------- UNSAFE SYSTEM ----------------------
+        class UnsafeBookingSystem {
+            int availableRooms = 1; // shared resource
 
-// Booking class
-        class Booking {
-            String bookingId;
-            String roomId;
-            String roomType;
-            boolean isCancelled;
+            public void book(String guestName) {
+                if (availableRooms > 0) {
+                    System.out.println(guestName + " is trying to book...");
 
-            Booking(String bookingId, String roomId, String roomType) {
-                this.bookingId = bookingId;
-                this.roomId = roomId;
-                this.roomType = roomType;
-                this.isCancelled = false;
+                    // Simulate delay → causes race condition
+                    try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+                    availableRooms--;
+                    System.out.println(guestName + " booked successfully!");
+                } else {
+                    System.out.println(guestName + " failed - No rooms available");
+                }
             }
         }
 
-// Main System
-        class HotelSystem {
+// ---------------------- SAFE SYSTEM ----------------------
+        class SafeBookingSystem {
+            int availableRooms = 1;
 
-            // Store bookings
-            private Map<String, Booking> bookings = new HashMap<>();
+            // synchronized → critical section protected
+            public synchronized void book(String guestName) {
+                if (availableRooms > 0) {
+                    System.out.println(guestName + " is trying to book...");
 
-            // Inventory (roomType -> count)
-            private Map<String, Integer> inventory = new HashMap<>();
+                    try { Thread.sleep(100); } catch (InterruptedException e) {}
 
-            // Stack for rollback (released room IDs)
-            private Stack<String> rollbackStack = new Stack<>();
-
-            // Constructor to initialize inventory
-            public HotelSystem() {
-                inventory.put("Single", 2);
-                inventory.put("Double", 2);
-            }
-
-            // Booking method
-             void bookRoom(String bookingId, String roomType) {
-                if (!inventory.containsKey(roomType) || inventory.get(roomType) == 0) {
-                    System.out.println("No rooms available for type: " + roomType);
-                    return;
+                    availableRooms--;
+                    System.out.println(guestName + " booked successfully!");
+                } else {
+                    System.out.println(guestName + " failed - No rooms available");
                 }
-
-                String roomId = roomType + "-" + (inventory.get(roomType));
-                inventory.put(roomType, inventory.get(roomType) - 1);
-
-                Booking booking = new Booking(bookingId, roomId, roomType);
-                bookings.put(bookingId, booking);
-
-                System.out.println("Booking confirmed: " + bookingId + " Room: " + roomId);
-            }
-
-            // Cancellation method (core logic)
-            void cancelBooking(String bookingId) {
-
-                // Step 1: Validate booking
-                if (!bookings.containsKey(bookingId)) {
-                    System.out.println("Invalid booking ID!");
-                    return;
-                }
-
-                Booking booking = bookings.get(bookingId);
-
-                if (booking.isCancelled) {
-                    System.out.println("Booking already cancelled!");
-                    return;
-                }
-
-                // Step 2: Record rollback (push to stack)
-                rollbackStack.push(booking.roomId);
-
-                // Step 3: Restore inventory
-                String roomType = booking.roomType;
-                inventory.put(roomType, inventory.get(roomType) + 1);
-
-                // Step 4: Update booking status
-                booking.isCancelled = true;
-
-                // Step 5: Confirm cancellation
-                System.out.println("Booking cancelled successfully: " + bookingId);
-                System.out.println("Room released: " + booking.roomId);
-            }
-
-            // Show inventory
-            void showInventory() {
-                System.out.println("Current Inventory: " + inventory);
-            }
-
-            // Show rollback stack
-            void showRollbackStack() {
-                System.out.println("Rollback Stack: " + rollbackStack);
             }
         }
 
-                HotelSystem system = new HotelSystem();
+// ---------------------- THREAD CLASS ----------------------
+        class BookingThread extends Thread {
+            String guestName;
+            Object system;
 
-                // Book rooms
-                system.bookRoom("B101", "Single");
-                system.bookRoom("B102", "Single");
+            BookingThread(String guestName, Object system) {
+                this.guestName = guestName;
+                this.system = system;
+            }
 
-                system.showInventory();
+            public void run() {
+                if (system instanceof UnsafeBookingSystem) {
+                    ((UnsafeBookingSystem) system).book(guestName);
+                } else if (system instanceof SafeBookingSystem) {
+                    ((SafeBookingSystem) system).book(guestName);
+                }
+            }
+        }
 
-                // Cancel booking
-                system.cancelBooking("B102");
+// ---------------------- MAIN CLASS ----------------------
 
-                system.showInventory();
+                // ----------- WITHOUT SYNCHRONIZATION -----------
+                System.out.println("=== Without Synchronization (Race Condition) ===");
 
-                // Try invalid cancellation
-                system.cancelBooking("B999");
+                UnsafeBookingSystem unsafe = new UnsafeBookingSystem();
 
-                // Try duplicate cancellation
-                system.cancelBooking("B102");
+                Thread t1 = new BookingThread("Guest 1", unsafe);
+                Thread t2 = new BookingThread("Guest 2", unsafe);
 
-                // View rollback stack
-                system.showRollbackStack();
+                t1.start();
+                t2.start();
+
+                try {
+                    t1.join();
+                    t2.join();
+                } catch (InterruptedException e) {}
+
+                // ----------- WITH SYNCHRONIZATION -----------
+                System.out.println("\n=== With Synchronization (Thread-Safe) ===");
+
+                SafeBookingSystem safe = new SafeBookingSystem();
+
+                Thread t3 = new BookingThread("Guest 1", safe);
+                Thread t4 = new BookingThread("Guest 2", safe);
+
+                t3.start();
+                t4.start();
+
+                try {
+                    t3.join();
+                    t4.join();
+                } catch (InterruptedException e) {}
             }
         }
