@@ -1,97 +1,132 @@
 import java.util.*;
+
+import java.io.*;
 public class BookMyStay {
     public static void main(String[] args) {
 
 
-        // ---------------------- UNSAFE SYSTEM ----------------------
-        class UnsafeBookingSystem {
-            int availableRooms = 1; // shared resource
 
-            public void book(String guestName) {
-                if (availableRooms > 0) {
-                    System.out.println(guestName + " is trying to book...");
+// ---------------------- BOOKING CLASS ----------------------
+        class Booking implements Serializable {
+            String bookingId;
+            String roomType;
 
-                    // Simulate delay → causes race condition
-                    try { Thread.sleep(100); } catch (InterruptedException e) {}
+            Booking(String bookingId, String roomType) {
+                this.bookingId = bookingId;
+                this.roomType = roomType;
+            }
 
-                    availableRooms--;
-                    System.out.println(guestName + " booked successfully!");
-                } else {
-                    System.out.println(guestName + " failed - No rooms available");
-                }
+            public String toString() {
+                return bookingId + " (" + roomType + ")";
             }
         }
 
-// ---------------------- SAFE SYSTEM ----------------------
-        class SafeBookingSystem {
-            int availableRooms = 1;
+// ---------------------- SYSTEM STATE ----------------------
+        class SystemState implements Serializable {
+            Map<String, Booking> bookings;
+            Map<String, Integer> inventory;
 
-            // synchronized → critical section protected
-            public synchronized void book(String guestName) {
-                if (availableRooms > 0) {
-                    System.out.println(guestName + " is trying to book...");
-
-                    try { Thread.sleep(100); } catch (InterruptedException e) {}
-
-                    availableRooms--;
-                    System.out.println(guestName + " booked successfully!");
-                } else {
-                    System.out.println(guestName + " failed - No rooms available");
-                }
+            SystemState(Map<String, Booking> bookings, Map<String, Integer> inventory) {
+                this.bookings = bookings;
+                this.inventory = inventory;
             }
         }
 
-// ---------------------- THREAD CLASS ----------------------
-        class BookingThread extends Thread {
-            String guestName;
-            Object system;
+// ---------------------- HOTEL SYSTEM ----------------------
+        class HotelSystem {
 
-            BookingThread(String guestName, Object system) {
-                this.guestName = guestName;
-                this.system = system;
+            private Map<String, Booking> bookings = new HashMap<>();
+            private Map<String, Integer> inventory = new HashMap<>();
+            private final String FILE_NAME = "system_state.ser";
+
+            public HotelSystem() {
+                // Default inventory
+                inventory.put("Single", 2);
+                inventory.put("Double", 2);
             }
 
-            public void run() {
-                if (system instanceof UnsafeBookingSystem) {
-                    ((UnsafeBookingSystem) system).book(guestName);
-                } else if (system instanceof SafeBookingSystem) {
-                    ((SafeBookingSystem) system).book(guestName);
+            // ---------------- BOOK ROOM ----------------
+            public void bookRoom(String bookingId, String roomType) {
+                if (!inventory.containsKey(roomType) || inventory.get(roomType) == 0) {
+                    System.out.println("No rooms available for " + roomType);
+                    return;
+                }
+
+                inventory.put(roomType, inventory.get(roomType) - 1);
+                bookings.put(bookingId, new Booking(bookingId, roomType));
+
+                System.out.println("Booked: " + bookingId);
+            }
+
+            // ---------------- SHOW DATA ----------------
+            public void showData() {
+                System.out.println("Bookings: " + bookings.values());
+                System.out.println("Inventory: " + inventory);
+            }
+
+            // ---------------- SAVE STATE ----------------
+            public void saveState() {
+                try (ObjectOutputStream oos = new ObjectOutputStream(
+                        new FileOutputStream(FILE_NAME))) {
+
+                    SystemState state = new SystemState(bookings, inventory);
+                    oos.writeObject(state);
+
+                    System.out.println("System state saved successfully!");
+
+                } catch (IOException e) {
+                    System.out.println("Error saving state: " + e.getMessage());
+                }
+            }
+
+            // ---------------- LOAD STATE ----------------
+            public void loadState() {
+                File file = new File(FILE_NAME);
+
+                // Handle missing file (failure tolerance)
+                if (!file.exists()) {
+                    System.out.println("No saved state found. Starting fresh.");
+                    return;
+                }
+
+                try (ObjectInputStream ois = new ObjectInputStream(
+                        new FileInputStream(FILE_NAME))) {
+
+                    SystemState state = (SystemState) ois.readObject();
+
+                    bookings = state.bookings;
+                    inventory = state.inventory;
+
+                    System.out.println("System state restored successfully!");
+
+                } catch (Exception e) {
+                    System.out.println("Error loading state. Starting fresh.");
                 }
             }
         }
 
 // ---------------------- MAIN CLASS ----------------------
 
-                // ----------- WITHOUT SYNCHRONIZATION -----------
-                System.out.println("=== Without Synchronization (Race Condition) ===");
 
-                UnsafeBookingSystem unsafe = new UnsafeBookingSystem();
+                HotelSystem system = new HotelSystem();
 
-                Thread t1 = new BookingThread("Guest 1", unsafe);
-                Thread t2 = new BookingThread("Guest 2", unsafe);
+                // Load previous state (Recovery)
+                system.loadState();
 
-                t1.start();
-                t2.start();
+                // Show current state
+                System.out.println("\n--- Current System State ---");
+                system.showData();
 
-                try {
-                    t1.join();
-                    t2.join();
-                } catch (InterruptedException e) {}
+                // Perform operations
+                system.bookRoom("B101", "Single");
+                system.bookRoom("B102", "Double");
 
-                // ----------- WITH SYNCHRONIZATION -----------
-                System.out.println("\n=== With Synchronization (Thread-Safe) ===");
+                System.out.println("\n--- After Booking ---");
+                system.showData();
 
-                SafeBookingSystem safe = new SafeBookingSystem();
+                // Save state before shutdown (Persistence)
+                system.saveState();
 
-                Thread t3 = new BookingThread("Guest 1", safe);
-                Thread t4 = new BookingThread("Guest 2", safe);
-
-                t3.start();
-                t4.start();
-
-                try {
-                    t3.join();
-                    t4.join();
-                } catch (InterruptedException e) {}
+                System.out.println("\nRestart the program to see recovery in action!");
             }
         }
